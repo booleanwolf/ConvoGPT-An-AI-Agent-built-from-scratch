@@ -298,19 +298,12 @@ class WifeyTool():
         time.sleep(float(t[0])/1000)
         print(f"{CYAN}Wifey Thinking...{WHITE}")
 
-    def BJ(self, t):
+    def Kiss(self, t):
         time.sleep(0.5)
-        chat_history.add_dq("assistant", "Gave BJ")
-        print(f"{GREEN}Wifey Giving BJ...{WHITE}")
+        chat_history.add_dq("assistant", "Kissed")
+        print(f"{GREEN}Wifey Giving Kiss...{WHITE}")
         time.sleep(1.5)
-         
-
-    def ShowBoobs(self, t):
-        time.sleep(0.5)
-        chat_history.add_dq("assistant", "Showed Boobs")
-        print(f"{BRIGHT_GREEN}Wifey showing boobos...{WHITE}")
-        time.sleep(1.5)
-         
+    
 
     def Wait(self, t):
         # print(f"{CYAN}Waiting...{WHITE}") 
