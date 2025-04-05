@@ -1,7 +1,5 @@
 class Prompt:
     
-    USER = "Tamim"
-    USERS_FULLNAME = "MD Tamim Sarkar"
 
     MEMORY_AGENT = """You are a memory agent. Your job is to provide a proper plan to store the information about TAMIM the person who is talking to you. Only output the json of planned tools.
 

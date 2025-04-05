@@ -7,6 +7,8 @@ import json
 from datetime import datetime 
 from collections import deque
 import time 
+from ToolExecutor import MemoryToolExecutor, WifeyToolExecutor
+from hyperparameters import Param
 
 load_dotenv()
 import sys
@@ -45,24 +47,24 @@ client_llm = OpenAI()
 
 class VectorDatabase:
     def __init__(self):
-        self.embedding_model= "text-embedding-3-small"
+        self.embedding_model= Param.embedding_model
 
         if not client_db.collection_exists(collection_name="semantic_collection"):
             semantic_collection = client_db.create_collection(
                 collection_name="semantic_collection",
-                vectors_config=models.VectorParams(size=1536, distance=models.Distance.COSINE),
+                vectors_config=models.VectorParams(size=Param.embedding_size, distance=models.Distance.COSINE),
             )
 
         if not client_db.collection_exists(collection_name="episodic_collection"):
             episodic_collection = client_db.create_collection(
                 collection_name="episodic_collection",
-                vectors_config=models.VectorParams(size=1536, distance=models.Distance.COSINE),
+                vectors_config=models.VectorParams(size=Param.embedding_size, distance=models.Distance.COSINE),
             )
 
         if not client_db.collection_exists(collection_name="procedural_collection"):
             procedural_collection = client_db.create_collection(
                 collection_name="procedural_collection",
-                vectors_config=models.VectorParams(size=1536, distance=models.Distance.COSINE),
+                vectors_config=models.VectorParams(size=Param.embedding_size, distance=models.Distance.COSINE),
             )
 
     def embed(self, text):
@@ -204,49 +206,6 @@ class VectorDatabase:
 
 
 
-class MemoryToolExecutor():
-    def __init__(self):
-        self.instance = database
-
-    def execute_method(self, method_name, *args, **kwargs):
-        # Get the method from the instance using getattr()
-        method = getattr(self.instance, method_name, None)
-
-        # Check if the method exists and is callable
-        if method and callable(method):
-            return method(*args, **kwargs)
-        else:
-            raise ValueError(f"Method '{method_name}' not found or is not callable on the instance.")
-    
-    def execute_memory_plan(self, tools_response):
-        if "tools" in tools_response:
-            data_json = json.loads(tools_response)
-
-            searched_info = ""
-
-            for tool in data_json["tools"]:
-                # Parse the function name and arguments
-                function_name = tool.split('(')[0]
-                arguments = tool.split('(')[1].split(')')[0].strip("'")
-
-                # debug_print(f"Executing {function_name} with {arguments}")
-                
-                # Call execute_method
-                if "search" in function_name:
-                    info = self.execute_method(function_name, arguments)
-                    # print("SEARCG INFO")    # print(info)
-                    if info:
-                        if type(info) == str:
-                            searched_info += f"{info} "
-                        else:
-                            for i in info:
-                                searched_info += i
-                                searched_info += " "
-                else:
-                    self.execute_method(function_name, [arguments])
-            
-            return searched_info
-
 class ChatQueue():
     def __init__(self):
         self.dq = deque(maxlen=50)
@@ -268,8 +227,8 @@ class ChatQueue():
       
 class MemoryAgent():
     def __init__(self):
-        self.model = "gpt-4o-mini"
-        self.max_completion_length = 1000
+        self.model = Param.memory_model
+        self.max_completion_length = Param.memory_MAX_COMPLETION_LENGTH
         self.system_prompt =  Prompt.MEMORY_AGENT
     
     def generate_memory_plan(self, text):
@@ -279,18 +238,53 @@ class MemoryAgent():
             ]
         
         response = client_llm.chat.completions.create(
-            model="gpt-4o",
+            model=self.model,
             messages=self.messages,
-            temperature=0.3,
+            temperature=Param.memory_TEMPERATURE,
             max_tokens=self.max_completion_length,
-            top_p=0.4,
-            frequency_penalty=0.0,
-            presence_penalty=0.0,
+            top_p=Param.memory_topP,
+            frequency_penalty=Param.frequency_penalty,
+            presence_penalty=Param.presence_penalty,
             response_format={ "type": "json_object" }
         )
 
         return response.choices[0].message.content
 
+
+
+class WifeyAgent():
+    def __init__(self):
+        self.model = Param.wife_model
+        self.max_completion_length = Param.wife_MAX_COMPLETION_LENGTH
+        self.system_prompts = Prompt.WIFEY_AGENT
+        
+        chat_history.add_dq("system", Prompt.WIFEY_AGENT)
+    
+    def run(self, text):
+        chat_history.add_dq("user", text) 
+
+        self.messages = chat_history.as_prompt_message() 
+        # print(self.messages)
+
+        # self.messages = [
+        #         {"role": "system", "content": self.system_prompts},
+        #         {"role": "user", "content": f"{text}\n\n."}
+        #     ]
+
+        response = client_llm.chat.completions.create(
+            model=self.model,
+            messages=self.messages,
+            temperature=Param.wife_TEMPERATURE,
+            max_tokens=self.max_completion_length,
+            top_p=Param.wife_topP,
+            frequency_penalty=Param.frequency_penalty,
+            presence_penalty=Param.presence_penalty,
+            response_format={ "type": "json_object" }
+        )
+
+        return response.choices[0].message.content
+
+############################################## ADD TOOLS ###################################################################################
 class WifeyTool():
     def __init__(self):
         pass 
@@ -322,69 +316,7 @@ class WifeyTool():
         # print(f"{CYAN}Waiting...{WHITE}") 
         # debug_print(int(t[0]))
         time.sleep(float(t[0])/1000)
-
-    
-class WifeyToolExecutor():
-    def __init__(self):
-        self.instance = WifeyTool()
-    
-    def execute_method(self, method_name, *args, **kwargs):
-        # Get the method from the instance using getattr()
-        method = getattr(self.instance, method_name, None)
-
-        # Check if the method exists and is callable
-        if method and callable(method):
-            return method(*args, **kwargs)
-        else:
-            raise ValueError(f"Method '{method_name}' not found or is not callable on the instance.")
-    
-    def execute_wifey_plan(self, tools_response):
-        if "tools" in tools_response:
-            data_json = json.loads(tools_response)
-
-            for tool in data_json["tools"]:
-                # Parse the function name and arguments
-                function_name = tool.split('(')[0]
-                arguments = tool.split('(')[1].split(')')[0].strip("'")
-                
-                self.execute_method(function_name, [arguments])
-            
-         
-        
-class WifeyAgent():
-    def __init__(self):
-        self.model = "gpt-4o-mini"
-        self.max_completion_length = 1000
-        self.system_prompts = Prompt.WIFEY_AGENT
-        
-        chat_history.add_dq("system", Prompt.WIFEY_AGENT)
-    
-    def run(self, text):
-        chat_history.add_dq("user", text) 
-
-        self.messages = chat_history.as_prompt_message() 
-        # print(self.messages)
-
-        # self.messages = [
-        #         {"role": "system", "content": self.system_prompts},
-        #         {"role": "user", "content": f"{text}\n\n."}
-        #     ]
-
-        response = client_llm.chat.completions.create(
-            model="gpt-4o",
-            messages=self.messages,
-            temperature=0.3,
-            max_tokens=self.max_completion_length,
-            top_p=0.4,
-            frequency_penalty=0.0,
-            presence_penalty=0.0,
-            response_format={ "type": "json_object" }
-        )
-
-        return response.choices[0].message.content
-
-
-        
+####################################################################################################################################
 if __name__ == "__main__":
     # print("\033[3mThis text is in italics\033[0m")
     # print(f"{GREEN}This is red text{WHITE}")
@@ -393,13 +325,13 @@ if __name__ == "__main__":
     chat_history = ChatQueue()
     database = VectorDatabase() 
     mem = MemoryAgent()
-    executor = MemoryToolExecutor()
+    executor = MemoryToolExecutor(database)
     wife = WifeyAgent()
-    wife_executor = WifeyToolExecutor() 
+    tools = WifeyTool()
+    wife_executor = WifeyToolExecutor(tools) 
+    
 
     
-    
-
     # print(client_db.get_collections())
     while True:
         
