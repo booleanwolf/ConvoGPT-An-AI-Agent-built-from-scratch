@@ -18,7 +18,8 @@ Follow the instructions below to set up and run the project locally.
 
 ```bash
 git clone https://github.com/your-username/ConvoGPT-An-AI-Agent-built-from-scratch.git
-cd ConvoGPT-An-AI-Agent-built-from-scratch```
+cd ConvoGPT-An-AI-Agent-built-from-scratch
+```
 
 ### 2. Install Dependencies 
 
